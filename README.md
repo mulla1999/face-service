@@ -160,6 +160,13 @@ ruff check . && pytest -q
       add a liveness model. Embedding similarity alone cannot tell a printed
       photo from a real face.
 
+## More projects
+
+- **[AI Agents](https://github.com/mulla1999/ai-agents)**: HireFinch, a multi-user AI job-search agent,
+  and Saathi, a welfare-scheme assistant, on a shared provider-agnostic LLM core.
+- **[Task Management System](https://github.com/mulla1999/sprih-task-management-system)**: Spring Boot
+  REST API with filtering, pagination and sorting.
+
 ## Licences
 
 - **Code** in this repository: [MIT](LICENSE).
