@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Face Identification</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f8fa; --card:#fff; --line:#dde4ec; --ink:#16222e; --muted:#5c6b7a;
+    --teal:#0e7d7b; --red:#c0334d;
+  }
+  body{background:var(--bg);color:var(--ink);font-family:'Sora',sans-serif;display:flex;flex-direction:column;align-items:center;padding:28px 16px;margin:0;}
+  h2{font-weight:700;letter-spacing:-0.01em;margin:0 0 18px;}
+  .stage{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 8px 24px rgba(22,34,46,.06);}
+  video{border-radius:8px;max-width:100%;display:block;}
+  canvas{position:absolute;inset:8px;width:calc(100% - 16px);height:calc(100% - 16px);}
+  .bar{margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--muted);}
+  .bar b{color:var(--teal);font-weight:600;}
+</style>
+</head>
+<body>
+<h2>Live Identify</h2>
+<div class="stage">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="overlay"></canvas>
+</div>
+<div class="bar">Server: <b id="status">connecting…</b> · Latency: <b id="lat">—</b></div>
+
+<script>
+// same host and port as this page; wss:// when served over HTTPS
+const WS_URL = location.protocol.startsWith('http')
+  ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/identify`
+  : 'ws://localhost:9999/ws/identify';
+let API_KEY = '';
+try{ API_KEY = sessionStorage.getItem('faceApiKey') || ''; }catch{}
+const FPS = 5; // identity doesn't change 30x/sec — 5 FPS is smooth & cheap
+
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const octx = overlay.getContext('2d');
+const statusEl = document.getElementById('status');
+const latEl = document.getElementById('lat');
+const work = document.createElement('canvas');
+const wctx = work.getContext('2d');
+let ws, busy = false, lastSend = 0;
+
+async function start(){
+  const stream = await navigator.mediaDevices.getUserMedia({video:{width:960}});
+  video.srcObject = stream;
+  await new Promise(r => video.onloadedmetadata = r);
+  overlay.width = work.width = video.videoWidth;
+  overlay.height = work.height = video.videoHeight;
+  connect();
+  requestAnimationFrame(loop);
+}
+
+function connect(){
+  ws = new WebSocket(WS_URL);
+  let refused = false;
+  ws.onopen = () => {
+    statusEl.textContent = 'connected';
+    if(API_KEY) { ws.send(API_KEY); busy = true; }  // first message authenticates when the server needs a key
+  };
+  ws.onclose = () => {
+    if(refused) return;
+    statusEl.textContent = 'reconnecting…'; setTimeout(connect, 1500);
+  };
+  ws.onmessage = (e) => {
+    busy = false;
+    const msg = JSON.parse(e.data);
+    if(msg.error === 'unauthorized'){
+      refused = true;
+      statusEl.textContent = 'API key needed: enter it on the main page, then reload';
+      return;
+    }
+    if(msg.error || msg.ok) return;
+    latEl.textContent = Math.max(0, Math.round((Date.now()/1000 - msg.ts)*1000)) + 'ms';
+    draw(msg.faces || []);
+  };
+}
+
+function loop(t){
+  if(ws && ws.readyState === 1 && !busy && t - lastSend > 1000/FPS){
+    wctx.drawImage(video, 0, 0);
+    const b64 = work.toDataURL('image/jpeg', 0.7).split(',')[1];
+    ws.send(b64);
+    busy = true; lastSend = t;
+  }
+  requestAnimationFrame(loop);
+}
+
+function draw(faces){
+  octx.clearRect(0,0,overlay.width,overlay.height);
+  for(const f of faces){
+    const [x1,y1,x2,y2] = f.bbox;
+    const known = !!f.name;
+    const color = known ? '#0e7d7b' : '#c0334d';
+    octx.strokeStyle = color;
+    octx.lineWidth = 3;
+    octx.strokeRect(x1, y1, x2-x1, y2-y1);
+    const label = known ? `${f.name} · ${f.match_percent}%` : 'UNKNOWN';
+    octx.font = '600 15px JetBrains Mono, monospace';
+    const w = octx.measureText(label).width + 16;
+    octx.fillStyle = color;
+    octx.fillRect(x1, y1-28, w, 26);
+    octx.fillStyle = '#ffffff';
+    octx.fillText(label, x1+8, y1-9);
+  }
+}
+
+start().catch(e => statusEl.textContent = 'camera error: ' + e.message);
+</script>
+</body>
+</html>

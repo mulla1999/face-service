@@ -1,0 +1,7 @@
+# Everything except the face models: enough to run the tests.
+fastapi==0.163.1
+uvicorn[standard]==0.54.0
+python-multipart==0.0.34
+numpy==1.26.4
+opencv-python-headless==4.11.0.86
+faiss-cpu==1.16.0

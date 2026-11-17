@@ -1,0 +1,24 @@
+[project]
+name = "face-service"
+version = "1.1.0"
+description = "Face verification (1:1) and real-time identification (1:N) API built on InsightFace ArcFace"
+requires-python = ">=3.12"
+license = "MIT"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 130
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = [
+    "S101",  # assert is how pytest checks
+    "B008",  # File(...)/Query(...) defaults are FastAPI's dependency idiom
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106"]  # fake API keys in tests

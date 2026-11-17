@@ -1,0 +1,27 @@
+services:
+  face-service:
+    build: .
+    container_name: face-service
+    ports:
+      # This machine only. To serve other devices, put HTTPS (nginx/Caddy) in
+      # front and set FACE_API_KEY, rather than opening the port to the network.
+      - "127.0.0.1:9999:9999"
+    volumes:
+      - face_data:/data          # enrolled identities persist here
+    environment:
+      FACE_DB_PATH: /data/identities.db
+      FACE_API_KEY: ${FACE_API_KEY:-}            # set in your shell or a .env file (never commit it)
+      FACE_CORS_ORIGINS: ${FACE_CORS_ORIGINS:-}
+    restart: unless-stopped
+    # For an NVIDIA GPU (needs onnxruntime-gpu in requirements.txt and
+    # FACE_CTX_ID=0), uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  face_data:

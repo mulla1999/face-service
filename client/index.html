@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Face Match — Identity Verification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #f6f8fa;
+    --card: #ffffff;
+    --line: #dde4ec;
+    --line-strong: #c3cedb;
+    --ink: #16222e;
+    --muted: #5c6b7a;
+    --teal: #0e7d7b;
+    --teal-soft: #e3f2f1;
+    --amber: #b3720a;
+    --amber-soft: #fdf3e0;
+    --red: #c0334d;
+    --red-soft: #fbe9ec;
+    --sans: 'Inter', sans-serif;
+    --display: 'Sora', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    --shadow: 0 1px 2px rgba(22,34,46,.05), 0 8px 24px rgba(22,34,46,.06);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); min-height:100vh;
+    padding:36px 20px 70px;
+  }
+  .wrap{max-width:900px;margin:0 auto;}
+
+  header{margin-bottom:30px;}
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--teal); margin-bottom:10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .eyebrow::before{content:''; width:16px; height:2px; background:var(--teal);}
+  h1{font-family:var(--display); font-size:clamp(26px,4.5vw,36px); font-weight:700; margin:0 0 8px; letter-spacing:-0.02em;}
+  .sub{color:var(--muted); font-size:14.5px; line-height:1.6; max-width:600px; margin:0;}
+
+  /* tabs */
+  .tabs{display:flex; gap:6px; margin:26px 0 20px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .tab{
+    font-family:var(--display); font-size:14px; font-weight:600;
+    background:none; border:none; cursor:pointer; color:var(--muted);
+    padding:10px 16px 12px; border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  .tab.active{color:var(--teal); border-bottom-color:var(--teal);}
+  .tab:focus-visible{outline:2px solid var(--teal); outline-offset:2px; border-radius:4px;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:24px;}
+
+  /* upload slots */
+  .pair{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:20px;}
+  @media (max-width:600px){ .pair{grid-template-columns:1fr;} }
+  .slot-label{font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:8px;}
+  .drop{
+    position:relative; border:1.5px dashed var(--line-strong); border-radius:10px;
+    min-height:220px; background:#fbfcfe;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; overflow:hidden; transition:border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.dragover{border-color:var(--teal); background:var(--teal-soft);}
+  .drop.has-image{border-style:solid; background:var(--card);}
+  .drop input{position:absolute; inset:0; opacity:0; cursor:pointer;}
+  .drop img{width:100%; height:100%; max-height:300px; object-fit:cover; display:block;}
+  .hint{text-align:center; color:var(--muted); font-size:13px; padding:18px; pointer-events:none;}
+  .hint svg{display:block; margin:0 auto 10px; color:var(--line-strong);}
+
+  .actions{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  button.primary{
+    font-family:var(--display); font-size:14px; font-weight:600;
+    background:var(--teal); color:#fff; border:none; border-radius:9px;
+    padding:12px 26px; cursor:pointer; transition:filter .12s, transform .12s;
+  }
+  button.primary:hover:not(:disabled){filter:brightness(1.08); transform:translateY(-1px);}
+  button.primary:disabled{opacity:.45; cursor:not-allowed;}
+  .spin{
+    width:16px; height:16px; border:2px solid var(--line); border-top-color:var(--teal);
+    border-radius:50%; animation:spin .8s linear infinite; display:none;
+  }
+  .spin.on{display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .err{color:var(--red); font-size:13px;}
+
+  /* result */
+  .result{display:none; margin-top:22px; padding-top:22px; border-top:1px solid var(--line); align-items:center; gap:30px; flex-wrap:wrap;}
+  .result.show{display:flex;}
+  .gauge{text-align:center;}
+  .gauge-caption{font-family:var(--mono); font-size:11px; letter-spacing:.14em; color:var(--muted); margin-top:8px; text-transform:uppercase;}
+  .verdict{font-family:var(--display); font-size:21px; font-weight:700; margin-bottom:6px;}
+  .verdict.same{color:var(--teal);} .verdict.uncertain{color:var(--amber);} .verdict.different{color:var(--red);}
+  .vdesc{color:var(--muted); font-size:13.5px; line-height:1.6; max-width:420px; margin-bottom:14px;}
+  .stats{display:flex; gap:26px; font-family:var(--mono); font-size:12px;}
+  .stats b{display:block; font-size:16px; color:var(--ink); margin-bottom:2px;}
+  .stats span{color:var(--muted); font-size:10px; letter-spacing:.1em; text-transform:uppercase;}
+
+  /* enroll + identify shared */
+  .row{display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:18px;}
+  .field{flex:1; min-width:200px;}
+  .field label{display:block; font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:7px;}
+  .field input[type=text]{
+    width:100%; border:1px solid var(--line-strong); border-radius:8px;
+    padding:11px 13px; font-family:var(--sans); font-size:14px; background:var(--card); color:var(--ink);
+  }
+  .field input[type=text]:focus{outline:2px solid var(--teal); outline-offset:-1px; border-color:var(--teal);}
+  .single-drop{min-height:190px;}
+  .msg{margin-top:14px; font-size:13.5px; padding:12px 14px; border-radius:8px; display:none;}
+  .msg.ok{display:block; background:var(--teal-soft); color:var(--teal);}
+  .msg.bad{display:block; background:var(--red-soft); color:var(--red);}
+
+  .id-faces{margin-top:20px; display:grid; gap:12px;}
+  .id-face{
+    border:1px solid var(--line); border-radius:10px; padding:14px 16px;
+    display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .id-name{font-family:var(--display); font-weight:600; font-size:16px;}
+  .id-meta{font-size:12px; color:var(--muted); font-family:var(--mono);}
+  .badge{font-family:var(--mono); font-size:12px; padding:5px 11px; border-radius:99px;}
+  .badge.known{background:var(--teal-soft); color:var(--teal);}
+  .badge.unknown{background:var(--red-soft); color:var(--red);}
+
+  .server-row{margin-top:26px; font-size:12.5px; color:var(--muted); display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+  .server-row input{
+    border:1px solid var(--line); border-radius:7px; padding:7px 10px;
+    font-family:var(--mono); font-size:12px; width:230px; color:var(--ink); background:var(--card);
+  }
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--line-strong);}
+  .dot.up{background:var(--teal);} .dot.down{background:var(--red);}
+
+  .footnote{margin-top:24px; font-size:12px; line-height:1.7; color:var(--muted); border-left:2px solid var(--line-strong); padding-left:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Identity Verification</div>
+    <h1>Face Match</h1>
+    <p class="sub">Upload two photos to check if they're the same person, enroll people for identification, or find who's in a photo. Different ages, styles, and lighting are handled by the model.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-panel="compare" role="tab">Compare two photos</button>
+    <button class="tab" data-panel="enroll" role="tab">Enroll a person</button>
+    <button class="tab" data-panel="identify" role="tab">Identify from photo</button>
+  </div>
+
+  <!-- COMPARE -->
+  <section class="panel active card" id="panel-compare">
+    <div class="pair">
+      <div>
+        <div class="slot-label">Photo A — e.g. old photo</div>
+        <div class="drop" data-drop="a">
+          <input type="file" accept="image/*" data-file="a" aria-label="Upload photo A">
+          <div class="hint">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+            Click or drop an image
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="slot-label">Photo B — e.g. recent photo</div>
+        <div class="drop" data-drop="b">
+          <input type="file" accept="image/*" data-file="b" aria-label="Upload photo B">
+          <div class="hint">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+            Click or drop an image
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="compareBtn" disabled>Compare faces</button>
+      <div class="spin" id="compareSpin"></div>
+      <div class="err" id="compareErr"></div>
+    </div>
+
+    <div class="result" id="compareResult">
+      <div class="gauge">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle cx="70" cy="70" r="58" fill="none" stroke="var(--line)" stroke-width="10"/>
+          <circle id="arc" cx="70" cy="70" r="58" fill="none" stroke="var(--teal)" stroke-width="10"
+            stroke-linecap="round" stroke-dasharray="364.4" stroke-dashoffset="364.4" transform="rotate(-90 70 70)"/>
+          <text id="arcText" x="70" y="78" text-anchor="middle" font-family="Sora" font-size="26" font-weight="700" fill="var(--ink)">0%</text>
+        </svg>
+        <div class="gauge-caption">Match score</div>
+      </div>
+      <div>
+        <div class="verdict" id="verdictEl">—</div>
+        <div class="vdesc" id="vdescEl"></div>
+        <div class="stats">
+          <div><b id="simEl">—</b><span>Cosine similarity</span></div>
+          <div><b id="latEl">—</b><span>Latency</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ENROLL -->
+  <section class="panel card" id="panel-enroll">
+    <div class="row">
+      <div class="field">
+        <label for="enrollName">Person's name</label>
+        <input type="text" id="enrollName" placeholder="e.g. Priya Sharma" autocomplete="off">
+      </div>
+    </div>
+    <div class="slot-label">Photo (enroll 2–3 different photos per person for best accuracy)</div>
+    <div class="drop single-drop" data-drop="enroll" style="margin-bottom:18px;">
+      <input type="file" accept="image/*" data-file="enroll" aria-label="Upload enrollment photo">
+      <div class="hint">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg>
+        Click or drop a clear, front-facing photo
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="enrollBtn" disabled>Enroll person</button>
+      <div class="spin" id="enrollSpin"></div>
+    </div>
+    <div class="msg" id="enrollMsg"></div>
+  </section>
+
+  <!-- IDENTIFY -->
+  <section class="panel card" id="panel-identify">
+    <div class="slot-label">Photo — every face found will be checked against enrolled people</div>
+    <div class="drop single-drop" data-drop="identify" style="margin-bottom:18px;">
+      <input type="file" accept="image/*" data-file="identify" aria-label="Upload photo to identify">
+      <div class="hint">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Click or drop a photo — group photos work too
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="identifyBtn" disabled>Identify faces</button>
+      <div class="spin" id="identifySpin"></div>
+      <div class="err" id="identifyErr"></div>
+    </div>
+    <div class="id-faces" id="idFaces"></div>
+  </section>
+
+  <div class="server-row">
+    <span class="dot" id="serverDot"></span>
+    Backend:
+    <input type="text" id="apiBase" spellcheck="false" aria-label="Backend URL">
+    <input type="password" id="apiKey" placeholder="API key (if required)" autocomplete="off" aria-label="API key">
+    <span id="serverInfo"></span>
+  </div>
+
+  <p class="footnote">
+    Match results are probabilistic, not proof of identity — don't use them alone for security, legal, or accusatory decisions. Face data is biometric data: only enroll people who have consented.
+  </p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const files = {};
+
+// ---- tabs ----
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  $('panel-' + t.dataset.panel).classList.add('active');
+}));
+
+// ---- drop zones ----
+document.querySelectorAll('.drop').forEach(zone => {
+  const key = zone.dataset.drop;
+  const input = zone.querySelector('input[type=file]');
+  const setFile = f => {
+    if(!f || !f.type.startsWith('image/')) return;
+    files[key] = f;
+    zone.classList.add('has-image');
+    let img = zone.querySelector('img');
+    if(!img){ img = document.createElement('img'); zone.insertBefore(img, zone.firstChild); zone.querySelector('.hint').style.display = 'none'; }
+    img.src = URL.createObjectURL(f);
+    refreshButtons();
+  };
+  input.addEventListener('change', e => setFile(e.target.files[0]));
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); setFile(e.dataTransfer.files[0]); });
+});
+
+function refreshButtons(){
+  $('compareBtn').disabled = !(files.a && files.b);
+  $('enrollBtn').disabled = !(files.enroll && $('enrollName').value.trim());
+  $('identifyBtn').disabled = !files.identify;
+}
+$('enrollName').addEventListener('input', refreshButtons);
+
+// served by the API itself -> same origin; opened as a file -> local default
+$('apiBase').value = location.protocol.startsWith('http') ? location.origin : 'http://localhost:9999';
+const api = () => $('apiBase').value.replace(/\/+$/, '');
+
+// the key lives only in this tab's session storage (live.html reads it from there too)
+try{ $('apiKey').value = sessionStorage.getItem('faceApiKey') || ''; }catch{}
+$('apiKey').addEventListener('change', () => { try{ sessionStorage.setItem('faceApiKey', $('apiKey').value); }catch{} ping(); });
+const call = (path, opts = {}) => {
+  const key = $('apiKey').value;
+  return fetch(api() + path, {...opts, headers: key ? {'X-API-Key': key} : {}});
+};
+
+// ---- health ping ----
+async function ping(){
+  try{
+    const r = await fetch(api() + '/health');
+    const j = await r.json();
+    $('serverDot').className = 'dot up';
+    $('serverInfo').textContent = `connected · ${j.enrolled} enrolled sample(s)` +
+      (j.auth_required && !$('apiKey').value ? ' · enter the API key' : '');
+  }catch{
+    $('serverDot').className = 'dot down';
+    $('serverInfo').textContent = 'not reachable — start the Python server';
+  }
+}
+ping(); setInterval(ping, 6000);
+$('apiBase').addEventListener('change', ping);
+
+// ---- compare ----
+$('compareBtn').addEventListener('click', async () => {
+  $('compareErr').textContent = ''; $('compareSpin').classList.add('on'); $('compareBtn').disabled = true;
+  try{
+    const fd = new FormData();
+    fd.append('image_a', files.a); fd.append('image_b', files.b);
+    const r = await call('/compare', {method:'POST', body:fd});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.detail || 'Request failed');
+    showCompare(j);
+  }catch(e){ $('compareErr').textContent = e.message; }
+  $('compareSpin').classList.remove('on'); $('compareBtn').disabled = false;
+});
+
+function showCompare(j){
+  const map = {
+    same_person:      {cls:'same', color:'var(--teal)', title:'Likely the same person', desc:'The two facial signatures align closely — these photos most likely show the same individual.'},
+    uncertain:        {cls:'uncertain', color:'var(--amber)', title:'Uncertain — borderline', desc:'The signatures are close but not conclusive. A large age gap, angle, or lighting may be lowering the score — try clearer, more front-facing photos.'},
+    different_person: {cls:'different', color:'var(--red)', title:'Likely different people', desc:'The facial signatures diverge enough that these are probably two different individuals.'}
+  };
+  const m = map[j.verdict];
+  $('verdictEl').className = 'verdict ' + m.cls;
+  $('verdictEl').textContent = m.title;
+  $('vdescEl').textContent = m.desc;
+  $('simEl').textContent = j.cosine_similarity.toFixed(3);
+  $('latEl').textContent = j.latency_ms + 'ms';
+  $('compareResult').classList.add('show');
+
+  const arc = $('arc'), txt = $('arcText'), C = 364.4, target = j.match_percent;
+  arc.style.stroke = m.color;
+  const start = performance.now(), dur = 800;
+  (function anim(t){
+    const p = Math.min(1, (t-start)/dur), e = 1 - Math.pow(1-p, 3);
+    arc.style.strokeDashoffset = C - (e*target/100)*C;
+    txt.textContent = Math.round(e*target) + '%';
+    if(p < 1) requestAnimationFrame(anim);
+  })(start);
+  $('compareResult').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// ---- enroll ----
+$('enrollBtn').addEventListener('click', async () => {
+  const msg = $('enrollMsg'); msg.className = 'msg'; $('enrollSpin').classList.add('on'); $('enrollBtn').disabled = true;
+  try{
+    const fd = new FormData();
+    fd.append('name', $('enrollName').value.trim());
+    fd.append('image', files.enroll);
+    const r = await call('/enroll', {method:'POST', body:fd});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.detail || 'Enrollment failed');
+    msg.className = 'msg ok';
+    msg.textContent = `Enrolled ${j.name}. Tip: add 1–2 more photos of them from different angles for better accuracy.`;
+    ping();
+  }catch(e){ msg.className = 'msg bad'; msg.textContent = e.message; }
+  $('enrollSpin').classList.remove('on'); refreshButtons();
+});
+
+// ---- identify ----
+$('identifyBtn').addEventListener('click', async () => {
+  $('identifyErr').textContent = ''; $('identifySpin').classList.add('on'); $('identifyBtn').disabled = true;
+  const list = $('idFaces'); list.replaceChildren();
+  try{
+    const fd = new FormData(); fd.append('image', files.identify);
+    const r = await call('/identify', {method:'POST', body:fd});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.detail || 'Request failed');
+    // names are user input: build nodes with textContent, never innerHTML
+    const el = (tag, cls, text) => { const n = document.createElement(tag); if(cls) n.className = cls; if(text !== undefined) n.textContent = text; return n; };
+    j.faces.forEach((f, i) => {
+      const known = f.identity && f.identity.confident;
+      const row = el('div', 'id-face');
+      const info = el('div');
+      info.append(
+        el('div', 'id-name', known ? f.identity.name : (f.identity ? f.identity.name + ' (uncertain)' : 'Unknown person')),
+        el('div', 'id-meta', `face ${i+1} · detector ${(f.det_score*100).toFixed(0)}%`));
+      row.append(info, el('span', 'badge ' + (known ? 'known' : 'unknown'), f.identity ? f.identity.match_percent + '% match' : 'no match'));
+      list.appendChild(row);
+    });
+    if(!j.faces.length) $('identifyErr').textContent = 'No faces found in this photo.';
+  }catch(e){ $('identifyErr').textContent = e.message; }
+  $('identifySpin').classList.remove('on'); $('identifyBtn').disabled = false;
+});
+</script>
+</body>
+</html>
